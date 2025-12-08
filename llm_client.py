@@ -16,33 +16,6 @@ server_params = StdioServerParameters(
     env=None,  # Optional environment variables
 )
 
-
-async def run():
-    """
-    Run an MCP client that connects to the server via stdio.
-    """
-    async with stdio_client(server_params) as (read, write):
-        async with ClientSession(
-            read, write
-        ) as session:
-            # Initialize the connection
-            await session.initialize()
-
-    # List available resources
-    resources = await session.list_resources()
-    print("LISTING RESOURCES")
-    for resource in resources:
-        print("Resource: ", resource)
-
-    # List available tools
-    tools = await session.list_tools()
-    print("LISTING TOOLS")
-    for tool in tools.tools:
-        print("Tool: ", tool.name)
-        print("Tool", tool.inputSchema["properties"])
-        functions.append(convert_to_llm_tool(tool))
-
-
 def convert_to_llm_tool(tool):
     """
     Convert an MCP tool definition to an LLM tool schema.
@@ -94,7 +67,7 @@ def call_llm(prompt, functions):
         # Optional parameters
         temperature=1.,
         max_tokens=1000,
-        top_p=1.    
+        top_p=1.0,
     )
 
     response_message = response.choices[0].message
@@ -110,10 +83,34 @@ def call_llm(prompt, functions):
 
     return functions_to_call
 
-if __name__ == "__main__":
-    import asyncio
 
-    asyncio.run(run())
+async def run():
+    """
+    Run an MCP client that connects to the server via stdio.
+    """
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(
+            read, write
+        ) as session:
+            # Initialize the connection
+            await session.initialize()
+
+    # List available resources
+    resources = await session.list_resources()
+    print("LISTING RESOURCES")
+    for resource in resources:
+        print("Resource: ", resource)
+
+    # List available tools
+    tools = await session.list_tools()
+    print("LISTING TOOLS")
+
+    functions = []
+
+    for tool in tools.tools:
+        print("Tool: ", tool.name)
+        print("Tool", tool.inputSchema["properties"])
+        functions.append(convert_to_llm_tool(tool))
 
     prompt = "Add 2 to 20"
 
@@ -124,3 +121,9 @@ if __name__ == "__main__":
     for f in functions_to_call:
         result = await session.call_tool(f["name"], arguments=f["args"])
         print("TOOLS result: ", result.content)
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(run())
