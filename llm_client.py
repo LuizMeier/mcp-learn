@@ -3,11 +3,15 @@ Example MCP client that connects to an MCP server via stdio.
 """
 import os
 import json
+import dotenv
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from azure.ai.inference import ChatCompletionsClient
-from azure.ai.inference.models import SystemMessage, UserMessage
+# from azure.ai.inference.models import SystemMessage, UserMessage
 from azure.core.credentials import AzureKeyCredential
+
+# Load dotend variables
+dotenv.load_dotenv()
 
 # Create server parameters for stdio connection
 server_params = StdioServerParameters(
@@ -40,7 +44,7 @@ def call_llm(prompt, functions):
     """
     Call the LLM with the given prompt and tool definitions.
     """
-    token = os.environ["GITHUB_TOKEN"]
+    token = os.environ.get("GITHUB_TOKEN")
     endpoint = "https://models.inference.ai.azure.com"
 
     model_name = "gpt-4o"
@@ -95,32 +99,32 @@ async def run():
             # Initialize the connection
             await session.initialize()
 
-    # List available resources
-    resources = await session.list_resources()
-    print("LISTING RESOURCES")
-    for resource in resources:
-        print("Resource: ", resource)
+            # List available resources
+            resources = await session.list_resources()
+            print("LISTING RESOURCES")
+            for resource in resources:
+                print("Resource: ", resource)
 
-    # List available tools
-    tools = await session.list_tools()
-    print("LISTING TOOLS")
+            # List available tools
+            tools = await session.list_tools()
+            print("LISTING TOOLS")
 
-    functions = []
+            functions = []
 
-    for tool in tools.tools:
-        print("Tool: ", tool.name)
-        print("Tool", tool.inputSchema["properties"])
-        functions.append(convert_to_llm_tool(tool))
+            for tool in tools.tools:
+                print("Tool: ", tool.name)
+                print("Tool", tool.inputSchema["properties"])
+                functions.append(convert_to_llm_tool(tool))
 
-    prompt = "Add 2 to 20"
+            prompt = "Add 2 to 20"
 
-    # ask LLM what tools to all, if any
-    functions_to_call = call_llm(prompt, functions)
+            # ask LLM what tools to call, if any
+            functions_to_call = call_llm(prompt, functions)
 
-    # call suggested functions
-    for f in functions_to_call:
-        result = await session.call_tool(f["name"], arguments=f["args"])
-        print("TOOLS result: ", result.content)
+            # call suggested functions
+            for f in functions_to_call:
+                result = await session.call_tool(f["name"], arguments=f["args"])
+                print("TOOLS result: ", result.content)
 
 
 if __name__ == "__main__":

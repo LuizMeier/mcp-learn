@@ -85,3 +85,6 @@ cython_debug/
 
 # VS Code
 .vscode/
+
+# dotenv environment variables file
+.env
