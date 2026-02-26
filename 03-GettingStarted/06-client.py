@@ -5,14 +5,33 @@ Demonstrates reading a resource, listing resources and tools, and calling a tool
 It will also read context messages (notifications) from the server.
 """
 import json
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+import asyncio
+import httpx
 
-# Create server parameters for stdio connection
-server_params = StdioServerParameters(
-    command="mcp",  # Executable
-    args=["run", "06-http-streaming.py"],  # Optional command line arguments
-    env=None,  # Optional environment variables
+# HTTP transport helper (not stdio)
+from mcp.client.streamable_http import streamable_http_client
+from mcp.client.session import ClientSession
+# parameter class lives in the session_group module
+from mcp.client.session_group import StreamableHttpParameters
+import mcp.types as types
+
+async def message_handler(msg):
+    """"
+    Handle incoming messages from the server, including notifications.
+    """
+    if isinstance(msg, types.ServerNotification):
+        print("NOTIFICATION:", msg)
+    else:
+        print("SERVER MESSAGE:", msg)
+
+
+
+# Create server parameters with http transport
+# NOTE: the installed MCP library uses the streamable_http transport helper
+server_params = StreamableHttpParameters(
+    url="http://localhost:8000/mcp",  # MCP server endpoint
+    headers={"Authorization": "Bearer my-secret-token"},  # Optional headers for authentication
+    # you can also adjust timeouts or termination behavior here
 )
 
 async def run():
@@ -20,9 +39,19 @@ async def run():
     Run an MCP client that connects to the server via http.
     Demonstrates reading a resource, listing resources and tools, and calling a tool.
     """
-    async with stdio_client(server_params) as (read, write):
+    # streamable_http_client expects a URL (and optional httpx client).
+    # we'll build a simple httpx client to include the headers from our
+    # parameters object.  for a real application you might call
+    # ``create_mcp_http_client`` from ``mcp.shared._httpx_utils`` instead.
+    async with streamable_http_client(
+        server_params.url,
+        http_client=httpx.AsyncClient(headers=server_params.headers),
+        terminate_on_close=server_params.terminate_on_close,
+    ) as (read, write, get_session_id):
         async with ClientSession(
-            read, write
+            read,
+            write,
+            message_handler=message_handler,   # receive notifications
         ) as session:
             # Initialize the connection
             await session.initialize()
@@ -58,28 +87,13 @@ async def run():
             for tool in tools.tools:
                 print("Tool: ", tool.name)
 
-            # Call a tool
-            print("\nCALL TOOL")
-            result = await session.call_tool("add", arguments={"a": 1, "b": 7})
-            print(result.content)
+            # Call all tools
+            for tool in tools.tools:
+                print(f"\nCALLING TOOL: {tool.name}")
+                result = await session.call_tool(
+                    tool.name,
+                    arguments={"message": "Hello from the client!", "ctx": None})
+                print("Tool result:", result.content)
 
 if __name__ == "__main__":
-    import asyncio
-
     asyncio.run(run())
-
-
-from mcp.client.session import ClientSession
-
-async def message_handler(message):
-    if isinstance(message, types.ServerNotification):
-        print("NOTIFICATION:", message)
-    else:
-        print("SERVER MESSAGE:", message)
-
-async with ClientSession(
-   read_stream, 
-   write_stream,
-   logging_callback=logging_collector,
-   message_handler=message_handler,
-) as session:

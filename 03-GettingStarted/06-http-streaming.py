@@ -5,6 +5,10 @@ import asyncio
 # Initialize FastMCP server
 mcp = FastMCP("my-lab")
 
+@mcp.resource("greeting://User", description="A simple greeting resource")
+async def greet():
+    return "Hello, User! Welcome to FastMCP."
+
 @mcp.tool(description="A tool that reads files and sends progress notifications")
 async def process_files(message: str, ctx) -> str:
 
